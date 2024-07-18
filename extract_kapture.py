@@ -8,7 +8,7 @@ import torch
 from os import path
 import numpy as np
 
-from torchvision.transforms import ToTensor
+from torchvision.transforms import ToTensor, Resize, Compose
 
 from modules.xfeat import XFeat
 
@@ -72,8 +72,10 @@ def extract_kapture_keypoints(args):
 
         xfeat = XFeat(top_k=args.top_k, weights=args.model)
 
-        to_tensor = ToTensor()
-
+        transforms = Compose([
+            ToTensor(),
+            Resize((480, 640)) # VGA resolution for XFeat
+        ])
 
         if kdata.keypoints is None:
             kdata.keypoints = {}
@@ -105,11 +107,19 @@ def extract_kapture_keypoints(args):
         for image_name in image_list:
             img_path = get_image_fullpath(args.kapture_root, image_name)
             print(f"\nExtracting features for {img_path}")
-            img = to_tensor(Image.open(img_path))
+            img = Image.open(img_path)
+            width_o, height_o = img.size
+
+            img = transforms(img)
 
             # extract keypoints/descriptors for a single image
             output = extract_function(img.unsqueeze(0), top_k=args.top_k)[0]
             xys = output['keypoints'].cpu().numpy()    # tensor(top_k, 2) - (x, y)
+
+            # convert to original image size
+            xys[:, 0] = xys[:, 0] * width_o / 640
+            xys[:, 1] = xys[:, 1] * height_o / 480
+
             desc = output['descriptors'].cpu().numpy() # tensor(top_k, 64)
             # TODO: see if there is a significant difference between the sparse/dense kp and if we need the third output
             third_output = output[third_arg] # can be either scales or scores depending on the function (dense/sparse)
@@ -125,7 +135,7 @@ def extract_kapture_keypoints(args):
                 kdata.keypoints[args.keypoints_type] = kapture.Keypoints('xfeat', keypoints_dtype, keypoints_dsize)
                 kdata.descriptors[args.descriptors_type] = kapture.Descriptors('xfeat', descriptors_dtype,
                                                                                descriptors_dsize,
-                                                                               args.keypoints_type, 'L2')
+                                                                               args.keypoints_type, 'MNN')
                 keypoints_config_absolute_path = get_feature_csv_fullpath(kapture.Keypoints,
                                                                           args.keypoints_type,
                                                                           args.kapture_root)
@@ -141,7 +151,7 @@ def extract_kapture_keypoints(args):
 
                 assert kdata.descriptors[args.descriptors_type].dsize == desc.shape[1]
                 assert kdata.descriptors[args.descriptors_type].keypoints_type == args.keypoints_type
-                assert kdata.descriptors[args.descriptors_type].metric_type == 'L2'
+                assert kdata.descriptors[args.descriptors_type].metric_type == 'MNN'
 
             keypoints_fullpath = get_keypoints_fullpath(args.keypoints_type, args.kapture_root,
                                                         image_name, tar_handlers)
