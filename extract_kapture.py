@@ -26,6 +26,7 @@ from kapture.io.features import get_keypoints_fullpath, keypoints_check_dir, ima
 from kapture.io.features import get_descriptors_fullpath, descriptors_check_dir, image_descriptors_to_file
 from kapture.io.csv import get_all_tar_handlers
 
+from tqdm import tqdm
 
 def extract_kapture_keypoints(args):
     """
@@ -103,10 +104,12 @@ def extract_kapture_keypoints(args):
             extract_function = xfeat.detectAndCompute
             third_arg = "scores"
 
+        print(f"Extracting {args.top_k} features per image... This may take a while...")
 
-        for image_name in image_list:
+        for i in tqdm(range(len(image_list))):
+            image_name = image_list[i]
             img_path = get_image_fullpath(args.kapture_root, image_name)
-            print(f"\nExtracting features for {img_path}")
+            # print(f"\nExtracting features for {img_path}")
             img = Image.open(img_path)
             width_o, height_o = img.size
 
@@ -155,13 +158,13 @@ def extract_kapture_keypoints(args):
 
             keypoints_fullpath = get_keypoints_fullpath(args.keypoints_type, args.kapture_root,
                                                         image_name, tar_handlers)
-            print(f"Saving {xys.shape[0]} keypoints to {keypoints_fullpath}")
+            # print(f"Saving {xys.shape[0]} keypoints to {keypoints_fullpath}")
             image_keypoints_to_file(keypoints_fullpath, xys)
             kdata.keypoints[args.keypoints_type].add(image_name)
 
             descriptors_fullpath = get_descriptors_fullpath(args.descriptors_type, args.kapture_root,
                                                             image_name, tar_handlers)
-            print(f"Saving {desc.shape[0]} descriptors to {descriptors_fullpath}")
+            # print(f"Saving {desc.shape[0]} descriptors to {descriptors_fullpath}")
             image_descriptors_to_file(descriptors_fullpath, desc)
             kdata.descriptors[args.descriptors_type].add(image_name)
 
@@ -182,15 +185,6 @@ if __name__ == '__main__':
 
     parser.add_argument("--kapture-root", type=str, required=True, help='path to kapture root directory')
 
-    parser.add_argument("--scale-f", type=float, default=2**0.25)
-    parser.add_argument("--min-size", type=int, default=256)
-    parser.add_argument("--max-size", type=int, default=1024)
-    parser.add_argument("--min-scale", type=float, default=0)
-    parser.add_argument("--max-scale", type=float, default=1)
-
-    parser.add_argument("--nms_dist", type=int, default=4)
-    parser.add_argument("--conf_thresh", type=float, default=0.015)
-    parser.add_argument("--nn_thresh", type=float, default=0.7)
 
     parser.add_argument("--dense", action='store_true', help='use dense feature extraction')
     parser.add_argument("--top-k", type=int, default=20000, help='number of keypoints to extract')
